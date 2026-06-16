@@ -1,0 +1,2 @@
+# LeitorNotebookLM
+leitor nfc simples
