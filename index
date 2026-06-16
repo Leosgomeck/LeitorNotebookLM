@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; text-align: center; background-color: #f4f4f9; }
+    button { background-color: #4CAF50; color: white; padding: 15px 32px; font-size: 16px; border: none; border-radius: 4px; cursor: pointer; width: 100%; max-width: 300px; margin-bottom: 20px; }
+    button:disabled { background-color: #cccccc; }
+    textarea { width: 100%; max-width: 500px; height: 200px; margin-top: 10px; font-family: monospace; padding: 10px; box-sizing: border-box; }
+    #status { margin: 15px 0; font-weight: bold; color: #333; }
+    .log-container { max-width: 500px; margin: 0 auto; text-align: left; }
+  </style>
+</head>
+<body>
+
+  <h2>Leitor de Cartão NFC</h2>
+  <p>Aproxime o cartão do celular após ativar a leitura. Os dados formatados para planilha aparecerão abaixo.</p>
+
+  <button id="scanBtn">Iniciar Leitura NFC</button>
+  <div id="status">Status: Pronto para iniciar.</div>
+
+  <div class="log-container">
+    <label for="output">Dados para copiar (Formato Tabulação/Planilha):</label>
+    <textarea id="output" readonly placeholder="Os dados lidos aparecerão aqui..."></textarea>
+    <br><br>
+    <button id="copyBtn" style="background-color: #008CBA;">Copiar Dados</button>
+  </div>
+
+  <script>
+    const scanBtn = document.getElementById('scanBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const statusDiv = document.getElementById('status');
+    const outputText = document.getElementById('output');
+
+    // Cabeçalho da tabela (Data/Hora, ID do Cartão, Conteúdo)
+    outputText.value = "Data/Hora\tID do Cartão\tConteúdo Lido\n";
+
+    scanBtn.addEventListener('click', async () => {
+      if ('NDEFReader' in window) {
+        try {
+          const ndef = new NDEFReader();
+          await ndef.scan();
+          
+          statusDiv.innerText = "Status: 📡 Buscando tag NFC... Aproxime o cartão.";
+          statusDiv.style.color = "blue";
+          scanBtn.disabled = true;
+
+          ndef.addEventListener("readingerror", () => {
+            statusDiv.innerText = "Erro: Não foi possível ler a tag. Tente novamente.";
+            statusDiv.style.color = "red";
+          });
+
+          ndef.addEventListener("reading", ({ message, serialNumber }) => {
+            statusDiv.innerText = "Status: ✅ Cartão lido com sucesso!";
+            statusDiv.style.color = "green";
+            
+            let numSerie = serialNumber || "N/A";
+            let textoLido = "";
+
+            // Processa as mensagens de texto dentro do NFC, se houverem
+            for (const record of message.records) {
+              if (record.recordType === "text") {
+                const textDecoder = new TextDecoder(record.encoding);
+                textoLido += textDecoder.decode(record.data) + " ";
+              }
+            }
+            if(!textoLido) textoLido = "Apenas ID detectado";
+
+            // Formata no padrão de linhas e abas (\t separa as colunas na planilha)
+            const agora = new Date().toLocaleString('pt-BR');
+            const novaLinha = `${agora}\t${numSerie}\t${textoLido.trim()}\n`;
+            
+            // Adiciona a nova linha na caixa de texto
+            outputText.value += novaLinha;
+            
+            // Restaura o botão após 2 segundos para nova leitura
+            setTimeout(() => {
+              statusDiv.innerText = "Status: 📡 Aguardando próximo cartão...";
+              statusDiv.style.color = "blue";
+            }, 2000);
+          });
+
+        } catch (error) {
+          statusDiv.innerText = "Erro ao iniciar NFC: " + error;
+          statusDiv.style.color = "red";
+        }
+      } else {
+        statusDiv.innerText = "Erro: Este navegador/dispositivo não suporta WebNFC. Use o Chrome no Android.";
+        statusDiv.style.color = "red";
+      }
+    });
+
+    // Função para copiar o texto gerado
+    copyBtn.addEventListener('click', () => {
+      outputText.select();
+      outputText.setSelectionRange(0, 99999);
+      navigator.clipboard.writeText(outputText.value);
+      alert("Dados copiados! Agora é só colar (Ctrl+V) na sua planilha.");
+    });
+  </script>
+</body>
+</html>
